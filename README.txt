@@ -21,3 +21,5 @@ also implemented for UniProt identifiers
 changed color of canonical motifs from "yellow" to "gold" for better readability
 Included handling of FASTA formats (headers) and possible whitespace in the sequence
 CSS was added to the UI function to allow for line breaks in long words (i.e. protein sequences)
+
+Starting from this point Git version control is enabled
