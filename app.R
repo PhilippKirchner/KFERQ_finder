@@ -1,4 +1,12 @@
-#testing layout options
+#V0.65
+#20180415
+
+#testing for the presence of dplyr and installing it if necessary
+if (!("dplyr" %in% rownames(installed.packages()))){
+  install.pakages("dplyr")
+  if (!("dplyr" %in% rownames(installed.packages())))
+    print("dplyr package could not be installed")
+  }
 
 library(shiny)
 library(dplyr)
