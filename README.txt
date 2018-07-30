@@ -26,3 +26,7 @@ Starting from this point Git version control is enabled
 
 0.65	2018-04-15
 To make launching the website easier I added a "launcher.R" script that will take care of loading the required packages. This could also be used to check for files and such
+
+0.8	2018-07-30
+Major update of the ui and server code. Data is now loaded on demand to increase performance. Motifs from precomputed tables and new sequences can now be downloaded as tables. Multiple sequences can be pasted or uploaded from file. Colored text output is moved to a separate tab in the from sequence window. Complete redesign of the interface to hopefully improve the usability and make the option of batch processing easier to see. The "more" tab is replaced with an "about" tab containing a brief rundown of the available functions. Styling information is moved to a separate CSS file ("styles.css").
+This version is intended to be loaded on its own and not through the launcher (additional packages that are required now are "readr" and "shinyjs"). 

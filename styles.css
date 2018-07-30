@@ -1,0 +1,43 @@
+.headBox{
+  height:360px;
+  background-color: #f0f8ff;
+}
+.IOHeader{
+  margin-top:0;
+}
+.bottomBox{
+  background-color: #f0f8ff;
+}
+.resultsBox{
+  min-height:100px;
+}
+.tabPaneContent{
+  background-color: #f0f8ff;
+  border:1px solid #e3e3e3;
+}
+.goButton{
+  width:100%;
+  font-size:1.25em;
+  font-weight:normal;
+  background-color: #f0f8ff;
+}
+.control-label{
+  font-size:100%;
+  font-weight:bold;
+}
+.tabbable > .nav > li > a{
+  color: #000000;
+}
+.tabbable > .nav > li[class=active] > a{
+  background-color: #f0f8ff;
+}
+h4{
+  font-size:1.25em;
+  margin-top:0.66em;
+  margin-bottom:1.33em;
+}
+div{
+  word-wrap:break-word;
+}
+
+                    
