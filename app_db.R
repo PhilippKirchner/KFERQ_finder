@@ -7,15 +7,19 @@ library(dplyr)
 library(readr)
 #shinyjs allows updating widgets
 library(shinyjs)
+#Database packages
+library(DBI)
+library(dbplyr)
+library(pool)
 #functions to get the motif data are located in helpers.R 
-source("helpers.R")
+source("helpers_db.R")
 
-#For the time being only the human data set is loaded as part of the regular start up routine
-#all.protCMA.human <- readRDS("data/allMotifs_human.Rds")
-#all.prot.human <- readRDS("data/allProt_human.Rds")
-
+#A list of all possible IDs
+allIDs <- readRDS("data/allIDs.Rds")
 #The list of all possible motifs is necessary to find motifs in unknown sequences
 modRef <- readRDS("data/motif_reference.Rds")
+#pool maintains the database connection
+con <- pool::dbPool(RSQLite::SQLite(), dbname = "data/KFERQ_finder.db")
 
 ui = fluidPage(
   useShinyjs(),
@@ -112,22 +116,49 @@ ui = fluidPage(
                         fluidRow(
                           br()
                         ),
-                        fluidRow(column(12,
-                                        wellPanel(class = "bottomBox",
-                                                  fluidRow(
-                                                    column(10,
-                                                           h4("motifs in the selected proteins:")),
-                                                    column(2,
-                                                           downloadButton("downloadTable_db", "download"))
-                                                  ),
-                                                  fluidRow(column(
-                                                    12,
-                                                    wellPanel(class = "resultsBox",
-                                                              tableOutput("motifList"))
-                                                  ))
-                                                  
-                                        ))
-                        )
+                        fluidRow(
+                          column(12,
+                                 tabsetPanel(
+                                   tabPanel(
+                                     "table output",
+                                     column(
+                                       12,
+                                       class = "tabPaneContent",
+                                       br(),
+                                       fluidRow(column(10,
+                                                       h4(
+                                                         "motifs in the selected proteins:"
+                                                       )),
+                                                column(
+                                                  2,
+                                                  downloadButton("downloadTable_db", "download")
+                                                )),
+                                       wellPanel(class = "resultsBox",
+                                                 tableOutput("motifList"))
+                                     )
+                                   ),
+                                   tabPanel(
+                                     "sequence output",
+                                     column(
+                                       12,
+                                       class = "tabPaneContent",
+                                       br(),
+                                       fluidRow(column(10,
+                                                       h4(
+                                                         "motifs in the selected proteins (max. 100 proteins):"
+                                                       )),
+                                                column(2
+                                                       #This button does not yet work
+                                                       #I have to find out how to get the formatted text out of shiny
+                                                       #downloadButton("downloadColor_seq", "download"))),)),)),
+                                                )),
+                                       wellPanel(class = "resultsBox",
+                                                 htmlOutput("color_db"))
+                                     )
+                                   )
+                                 )
+                          )
+                        ) 
                       )
              ),
              tabPanel(
@@ -304,8 +335,12 @@ ui = fluidPage(
                               br(),
                               h4("results"),
                               "The motifs identified and some information such as the protein names are displayed in the output.
-                              The results table can be downloaded as comma-separated (.csv) file.",
-                              br()
+                              The results table can be downloaded as comma-separated (.csv) file. In addition to the table output format motifs can also be displayed as colored text within the
+                              amino acid sequence. This output format is limited to 100 sequences. Longer input 
+                              should be split accordingly",
+                              br(),
+                              "RIGHT NOW THIS VISUALIZATION CANNOT BE DIRECTLY DOWNLOADED. HOWEVER IT IS POSSIBLE TO COPY-PASTE
+                              IT INTO A TEXT EDITOR."
                             )
                           ),
                           br(),
@@ -326,12 +361,7 @@ ui = fluidPage(
                               "The same output options are used as when identifying motifs from data base entries.",
                               br(),
                               h4("results"),
-                              "In addition to the table output format motifs can also be displayed as colored text within the
-                              amino acid sequence. This output format is limited to 100 sequences. Longer input 
-                              should be split accordingly",
-                              br(),
-                              "RIGHT NOW THIS VISUALIZATION CANNOT BE DIRECTLY DOWNLOADED. HOWEVER IT IS POSSIBLE TO COPY-PASTE
-                              IT INTO A TEXT EDITOR."
+                              "Outputs are the same as for motifs from data base"  
                             )
                           )
                           )
@@ -343,7 +373,7 @@ ui = fluidPage(
 server = function(input, output, session) {
   #This makes quits the app once the browser window is closed
   session$onSessionEnded(stopApp)
-
+  
   #server functions for finding motifs for a given UniProt entry
   #-----------------------
   #The motif kinds are put together from the standard and advanced motif checkboxes
@@ -352,32 +382,15 @@ server = function(input, output, session) {
       c(input$stdMotifs_base,input$advMotifs_base))
   })
   
-  #The current version works with the human mousa and rat proteome
-  #Additional proteomes can be added using the "makeMotifList" function from the helpers.R script
-  #In the future a relational db could help speeding things up a little
-  #To save time data sets are only loaded when needed (the option "human" is enabled by default)
-  all.protCMA <- reactive({
-    return(
-      switch(input$organism,
-             "human" = readRDS("data/allMotifs_human.Rds"),#all.protCMA.human,
-             "mouse" = readRDS("data/allMotifs_mouse.Rds"),#all.protCMA.mouse,
-             "rat" = readRDS("data/allMotifs_rat.Rds")#all.protCMA.rat
-      ))
+  #according to the selected organism all available IDs are selected and then displayed in the
+  #selectizeInput
+  availableEntries <- reactive({
+    return(filter(allIDs, organism == input$organism))
   })
-  
-  all.prot <- reactive({
-    return(
-      switch(input$organism,
-             "human" = readRDS("data/allProt_human.Rds"),#all.prot.human,
-             "mouse" = readRDS("data/allProt_mouse.Rds"),#all.prot.mouse,
-             "rat" = readRDS("data/allProt_rat.Rds")#all.prot.rat
-      ))
-  })
-  
-  #If the all.prot data set changes the available UniProt IDs are updated  
   observe({
-    updateSelectizeInput(session, "selectEntries", choices = all.prot()$entry, server = T)
+    updateSelectizeInput(session, "selectEntries", choices = availableEntries()$entry, server = T)
   })
+  
   #Entries are saved in different places depending if they come from the drop down menu or
   #file upload (This is necessary to allow for both input methods to be mutually exclusive)
   Entries <- reactiveValues(
@@ -391,7 +404,6 @@ server = function(input, output, session) {
       reset("uploadFile_db")
       Entries$file <- NULL
     }
-    
   })
   observe({
     req(input$uploadFile_db)
@@ -399,19 +411,21 @@ server = function(input, output, session) {
     reset("selectEntries")
   })
   
-  
-  motifsFromDataBase <- eventReactive(input$go_db, {
+  currentEntries <- eventReactive(input$go_db, {
     if(is.null(Entries$file)){
       req(Entries$select)
-      Entries <- input$selectEntries
+      return(input$selectEntries)
     }
     else{
       #Uniprot identifiers have to be upper case
-      Entries <- toupper(Entries$file)
+      return(toupper(Entries$file))
     }
-    motifsFound <- findMotifs(Entries, all.protCMA = all.protCMA(), all.prot = all.prot(),
-                              motifKinds = whichMotifs_base())
-    invalidEntries <- Entries[!(Entries %in% all.prot()$entry)]
+  })
+  
+  motifsFromDataBase <- reactive({
+    Entries <- currentEntries()
+    motifsFound <- findMotifs(Entries, con = con, motifKinds = whichMotifs_base())
+    invalidEntries <- Entries[!(Entries %in% allIDs$entry)]
     if (length(invalidEntries) > 0){
       invalidEntries <- data.frame(entry = invalidEntries, status = NA, protein_names = "no matching Uniprot ID found",
                                    gene_names = "no matching Uniprot ID found", length = NA,
@@ -438,6 +452,11 @@ server = function(input, output, session) {
       write.csv(motifsFromDataBase(),file,row.names = F)
     }
   )
+  output$color_db <- renderUI({
+    Entries <- currentEntries()
+    HTML(paste0(makeColorText_db(Entries, con = con, motifKinds = whichMotifs_base())$html,collapse=""))
+  })
+  
   
   #server functions for finding motifs in an unknown sequence
   #--------------------
