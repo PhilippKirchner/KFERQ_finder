@@ -1,5 +1,5 @@
-#V0.8
-#20180730
+#V0.85
+#20180804
 
 #The following packages are required (for increased robustness the whole tidyverse could be loaded)
 library(shiny)
@@ -147,10 +147,8 @@ ui = fluidPage(
                                                        h4(
                                                          "motifs in the selected proteins (max. 100 proteins):"
                                                        )),
-                                                column(2
-                                                       #This button does not yet work
-                                                       #I have to find out how to get the formatted text out of shiny
-                                                       #downloadButton("downloadColor_seq", "download"))),)),)),
+                                                column(2,
+                                                       downloadButton("downloadColor_db", "download")
                                                 )),
                                        wellPanel(class = "resultsBox",
                                                  htmlOutput("color_db"))
@@ -272,10 +270,8 @@ ui = fluidPage(
                                                 h4(
                                                   "motifs in the selected proteins (max. 100 proteins):"
                                                 )),
-                                         column(2
-                                                #This button does not yet work
-                                                #I have to find out how to get the formatted text out of shiny
-                                                #downloadButton("downloadColor_seq", "download"))),)),)),
+                                         column(2,
+                                                downloadButton("downloadColor_seq", "download")
                                          )),
                                 wellPanel(class = "resultsBox",
                                           htmlOutput("colorSeq"))
@@ -296,7 +292,7 @@ ui = fluidPage(
                             11,
                             offset = 1,
                             p(
-                              "Version 0.8  2018 07 13",
+                              "Version 0.85  2018 08 04",
                               br(),
                               br(),
                               "CMA-targeting (KFERQ-like) targeting motifs can be searched
@@ -339,8 +335,7 @@ ui = fluidPage(
                               amino acid sequence. This output format is limited to 100 sequences. Longer input 
                               should be split accordingly",
                               br(),
-                              "RIGHT NOW THIS VISUALIZATION CANNOT BE DIRECTLY DOWNLOADED. HOWEVER IT IS POSSIBLE TO COPY-PASTE
-                              IT INTO A TEXT EDITOR."
+                              "This output format can be downloaded as a html file."
                             )
                           ),
                           br(),
@@ -446,17 +441,36 @@ server = function(input, output, session) {
   #download results to file
   output$downloadTable_db <- downloadHandler(
     filename = function(){
-      paste0("KFERQ_finder_table_",format(Sys.time(), "%Y%m%d_%H%M"),".csv",sep ="")
+      paste0("CMA_motifs_UniProt_",format(Sys.time(), "%Y%m%d_%H%M"),".csv",sep ="")
     },
     content = function(file){
       write.csv(motifsFromDataBase(),file,row.names = F)
     }
   )
+  #From the sequence information html formatted text is generated
+  htmlText_db <- reactive(
+    makeColorText_db(currentEntries(), con = con, motifKinds = whichMotifs_base())
+  )
   output$color_db <- renderUI({
-    Entries <- currentEntries()
-    HTML(paste0(makeColorText_db(Entries, con = con, motifKinds = whichMotifs_base())$html,collapse=""))
+    HTML(paste0(htmlText_db()$html,collapse=""))
   })
-  
+  #download the colored text as an html file
+  output$downloadColor_db <- downloadHandler(
+    filename = function(){
+      paste0("CMA_motifs_UniProt_",format(Sys.time(), "%Y%m%d_%H%M"),".html",sep ="")
+    },
+    content = function(file){
+      tmpFile <- paste0(tempdir(),"tmp_",format(Sys.time(), "%H%M%S"),".txt")
+      sink(tmpFile)
+      cat("<!DOCTYPE HTML><head></head><body><div style=\"word-wrap:break-word\">")
+      sapply(seq_len(nrow( htmlText_db() )),
+             function(x){cat(htmlText_db()$html[x])})
+      cat("</div></body>")
+      sink()
+      file.copy(tmpFile, file)
+      file.remove(tmpFile)
+    }
+  )
   
   #server functions for finding motifs in an unknown sequence
   #--------------------
@@ -514,9 +528,29 @@ server = function(input, output, session) {
   )
   #This function may take quite a while to execute for longer sequences
   #to avoid trouble with this kind of function maximally 100 sequences will be displayed
+  htmlText_seq <- reactive(
+    makeColorText(motifsFromSeq())
+  )
   output$colorSeq <- renderUI({
-      HTML(paste0(makeColorText(motifsFromSeq())$html,collapse=""))
+      HTML(paste0(htmlText_seq()$html,collapse=""))
   })
+  #download the colored text as an html file
+  output$downloadColor_seq <- downloadHandler(
+    filename = function(){
+      paste0("CMA_motifs_from_sequence_",format(Sys.time(), "%Y%m%d_%H%M"),".html",sep ="")
+    },
+    content = function(file){
+      tmpFile <- paste0(tempdir(),"tmp_",format(Sys.time(), "%H%M%S"),".txt")
+      sink(tmpFile)
+      cat("<!DOCTYPE HTML><head></head><body><div style=\"word-wrap:break-word\">")
+      sapply(seq_len(nrow(htmlText_seq())),
+             function(x){cat(htmlText_seq()$html[x])})
+      cat("</div></body>")
+      sink()
+      file.copy(tmpFile, file)
+      file.remove(tmpFile)
+    }
+  )
 }
 
 shinyApp(ui = ui, server = server)
