@@ -1,2 +1,5 @@
-data/*.Rds
-data/*.db
+data/
+manual_backups/
+.DS_Store
+.Rapp.history
+.Rhistory
